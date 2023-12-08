@@ -1,15 +1,5 @@
 # layc
 
-To install dependencies:
+> simplified node/bun web framework
 
-```bash
-bun install
-```
-
-To run:
-
-```bash
-bun run lib/index.js
-```
-
-This project was created using `bun init` in bun v1.0.0. [Bun](https://bun.sh) is a fast all-in-one JavaScript runtime.
+**just imagine this**: you're building a web... okay, maybe don't.
