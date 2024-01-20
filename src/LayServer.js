@@ -25,6 +25,7 @@ export default class LayServer {
 
 			for (const key of optionKeys) {
 				if (!this.options.has(key)) continue;
+				if (key == 'loaders') continue;
 				const valueType = typeof this.options.get(key);
 				if (
 					typeof options[key] !== 'undefined' &&
@@ -32,6 +33,12 @@ export default class LayServer {
 						valueType == 'undefined')
 				)
 					this.options.set(key, options[key]);
+			}
+
+			if (options.hasOwnProperty('loaders')) {
+				if (options.loaders instanceof Map) {
+					this.loaders = options.loaders;
+				}
 			}
 		}
 
