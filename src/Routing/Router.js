@@ -13,6 +13,10 @@ export default class Router {
 		this.server = server;
 	}
 
+	getServer() {
+		return this.server;
+	}
+
 	async handle(req) {
 		if (!(req instanceof Request)) {
 			throw new Error('`req` is not a proper Request');

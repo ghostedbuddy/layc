@@ -5,17 +5,18 @@ import HtmlEngine from './Views/HtmlEngine';
 
 export default class LayServer {
 	controllers = new Map();
+	loaders = new Map();
 	proc = null;
 	router;
 	publicFiles;
 	options = new Map([
+		['loaders', undefined],
 		['publicDir', undefined],
 		['viewsPath', undefined],
-		['viewsEngine', undefined],
-		['onlySingleRoutes', true],
 		['preferIndexFiles', false],
-		['discoverPublicFiles', true],
-		['enforceTrailingSlash', true],
+		['discoverPublicFiles', false],
+		['enforceTrailingSlash', false],
+		['laycLoading', false],
 	]);
 
 	constructor(options = {}) {
@@ -25,7 +26,11 @@ export default class LayServer {
 			for (const key of optionKeys) {
 				if (!this.options.has(key)) continue;
 				const valueType = typeof this.options.get(key);
-				if (typeof options[key] == valueType)
+				if (
+					typeof options[key] !== 'undefined' &&
+					(typeof options[key] == valueType ||
+						valueType == 'undefined')
+				)
 					this.options.set(key, options[key]);
 			}
 		}
@@ -37,6 +42,7 @@ export default class LayServer {
 		}
 
 		if (options.publicFiles) {
+			console.log('publicFiles', options.publicFiles);
 			this.addPublicFileRoutes(options.publicFiles);
 		}
 
@@ -64,7 +70,11 @@ export default class LayServer {
 			throw new Error(
 				'publicFiles option has to be an array or undefined'
 			);
+		if (!this.publicFiles || !Array.isArray(this.publicFiles))
+			this.publicFiles = [];
 		for (let path of filePaths) {
+			if (typeof path != 'string') continue;
+			this.publicFiles.push(path);
 		}
 	}
 
@@ -77,8 +87,7 @@ export default class LayServer {
 	}
 
 	registerControllers(controllers) {
-		if (!Array.isArray(controllers))
-			throw new Error('controllers is not an Array');
+		if (!Array.isArray(controllers)) controllers = [controllers];
 
 		for (let controller of controllers) {
 			if (typeof controller != 'function') {
@@ -86,8 +95,14 @@ export default class LayServer {
 				continue;
 			}
 
+			// if the given controller is just an anonymous function defining the routes itself
+			if (!controller?.prototype?.constructor?.name) {
+				controller(this.routeControl);
+				continue;
+			}
+
 			this.controllers.set(
-				controller.name,
+				controller?.name,
 				this.instantiateController(controller)
 			);
 		}
@@ -118,10 +133,16 @@ export default class LayServer {
 			if (path) {
 				try {
 					return new Response(
-						Bun.file(resolvePath(import.meta.dir, 'public', path))
+						Bun.file(
+							resolvePath(
+								this.options.get('publicDir') ??
+									`${import.meta.dir}/public`,
+								path
+							)
+						)
 					);
 				} catch (err) {
-					console.log(err);
+					console.log(err, import.meta.dir, 'public', path);
 					return new Response('Internal Server Error', {
 						status: 500,
 					});
@@ -133,7 +154,11 @@ export default class LayServer {
 			return Response.redirect(`${url.toString()}/`, 302);
 		}
 
-		return await this.router.handle(req);
+		let resp = await this.router.handle(req);
+
+		if (!resp) return new Response('Not Found', { status: 404 });
+
+		return resp;
 	}
 
 	listen(port = 8080) {
@@ -163,6 +188,17 @@ export default class LayServer {
 		} catch (err) {
 			console.log('where', err.stack);
 			console.error(err);
+		}
+	}
+
+	load(filepath) {
+		const filename = filepath.split('/').pop().toString();
+		const ext = filename.split('.').pop().toLowerCase();
+
+		for (const keys of this.loaders.keys()) {
+			if (keys.includes(ext)) {
+				return this.loaders.get(keys)(filepath);
+			}
 		}
 	}
 }

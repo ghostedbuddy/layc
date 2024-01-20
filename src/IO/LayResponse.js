@@ -99,4 +99,11 @@ export default class LayResponse {
 			headers: this.headers(),
 		});
 	}
+
+	render(path, data = {}) {
+		return new Response(this.router.getServer().load(path).parse(data), {
+			status: this.status(),
+			headers: this.headers(),
+		});
+	}
 }
