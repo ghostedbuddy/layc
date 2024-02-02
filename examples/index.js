@@ -1,4 +1,4 @@
-import { LayServer } from '../lib';
+import { LayServer } from '../src';
 import { google } from 'googleapis';
 
 class InfoController {
