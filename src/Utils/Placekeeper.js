@@ -68,6 +68,12 @@ export default class Placekeeper {
 						['end', -1],
 					]);
 				currentVar.set('name', currentVar.get('name') + char);
+			} else if (currentVar instanceof Map) {
+				currentVar.set('end', idx);
+				if (currentVar.get('name').length > 0) {
+					variables.set(currentVar.get('name'), currentVar);
+				}
+				currentVar = null;
 			}
 		}
 	}
