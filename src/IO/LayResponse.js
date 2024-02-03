@@ -100,10 +100,12 @@ export default class LayResponse {
 		});
 	}
 
-	render(path, data = {}) {
-		return new Response(this.router.getServer().load(path).parse(data), {
+	async render(path, data = {}) {
+		const loader = await this.router.getServer().load(path);
+		const content = await loader.parse(data, {
 			status: this.status(),
 			headers: this.headers(),
 		});
+		return content;
 	}
 }
