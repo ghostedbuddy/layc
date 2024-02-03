@@ -38,9 +38,6 @@ export default class Placekeeper {
 						);
 						sections.push(new Map(currentSection));
 						currentSection.clear();
-						for (const [key, value] of sectionVars) {
-							variables.set(key, value);
-						}
 						idx++;
 					}
 				}
@@ -53,6 +50,8 @@ export default class Placekeeper {
 		};
 	}
 
+	static variableRegex = new RegExp(/[\w\d]/, 'i');
+
 	static parseVariables(content) {
 		// iterates over the content character by character to extract variables and returns a list of them
 		const variables = new Map();
@@ -60,8 +59,8 @@ export default class Placekeeper {
 
 		for (let idx = 0; idx < content.length; idx++) {
 			const char = content[idx];
-			if (char.matches(/[\w\d]/)) {
-				if (!currentVar instanceof Map)
+			if (Placekeeper.variableRegex.test(char)) {
+				if (!(currentVar instanceof Map))
 					currentVar = new Map([
 						['name', ''],
 						['start', idx],
