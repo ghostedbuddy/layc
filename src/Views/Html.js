@@ -4,6 +4,14 @@ export default class HtmlEngine {
 	#internalCache = new Map();
 	constructor() {}
 
+	/**
+	 * Handles the specified file by loading its content, parsing sections and variables,
+	 * and caching the result.
+	 *
+	 * @param {string} filepath - The path of the file to handle.
+	 * @returns {Object} - An object with a `parse` method that can be used to parse the file.
+	 * @throws {Error} - If the file is not found.
+	 */
 	async handle(filepath) {
 		// load file
 		const file = Bun.file(filepath);
@@ -26,6 +34,14 @@ export default class HtmlEngine {
 		};
 	}
 
+	/**
+	 * Parses the specified identifier using the provided data and options.
+	 * @param {string} identifier - The identifier of the file to parse.
+	 * @param {Object} [data={}] - The data object to replace placeholders in the file content.
+	 * @param {Object} [options={}] - The options object.
+	 * @returns {Response} - The parsed response object.
+	 * @throws {Error} - If the file is not found.
+	 */
 	parse(identifier, data = {}, options = {}) {
 		if (!this.#internalCache.has(identifier)) {
 			throw new Error('file not found');
