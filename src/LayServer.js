@@ -1,8 +1,15 @@
 import { resolve as resolvePath } from 'path';
 import Router from './Routing/Router';
 import LayRouting from './Routing/LayRouting';
-import HtmlEngine from './Views/HtmlEngine';
+import HtmlEngine from './Views/Html';
+import DefaultLoader from './Views/DefaultLoader';
+import { readdir } from 'fs/promises';
 
+/**
+ * Represents a LayServer instance that handles routing and server configuration.
+ * @todo add multi domain support
+ * @class
+ */
 export default class LayServer {
 	controllers = new Map();
 	loaders = new Map();
@@ -19,6 +26,10 @@ export default class LayServer {
 		['laycLoading', false],
 	]);
 
+	/**
+	 * Creates a new instance of LayServer.
+	 * @param {Object} options - The options for configuring the LayServer.
+	 */
 	constructor(options = {}) {
 		if (typeof options == 'object') {
 			const optionKeys = Object.getOwnPropertyNames(options);
@@ -48,10 +59,7 @@ export default class LayServer {
 			this.registerControllers(options.controllers);
 		}
 
-		if (options.publicFiles) {
-			console.log('publicFiles', options.publicFiles);
-			this.addPublicFileRoutes(options.publicFiles);
-		}
+		if (options.publicFiles) this.addPublicFileRoutes(options.publicFiles);
 
 		if (
 			!options.publicFiles &&
@@ -65,12 +73,23 @@ export default class LayServer {
 		}
 	}
 
+	/**
+	 * Retrieves or sets the value of an option.
+	 * @param {string} key - The key of the option.
+	 * @param {*} [value] - The value to set for the option. If not provided, the current value of the option is returned.
+	 * @returns {*} - The current value of the option, or undefined if the option does not exist.
+	 */
 	option(key, value = undefined) {
 		if (!this.options.has(key)) return undefined;
 		if (value !== undefined) this.option.set(key, value);
 		return this.options.get(key);
 	}
 
+	/**
+	 * Adds public file routes to the LayServer instance.
+	 * @param {Array<string>} filePaths - An array of file paths to be added as public file routes.
+	 * @throws {Error} Throws an error if filePaths is not an array or undefined.
+	 */
 	addPublicFileRoutes(filePaths) {
 		if (!filePaths) return;
 		if (!Array.isArray(filePaths))
@@ -85,14 +104,30 @@ export default class LayServer {
 		}
 	}
 
-	indexPublicFiles(publicDir) {}
+	/**
+	 * Indexes all public files stored as static routes.
+	 * @todo Implement this method.
+	 * @param {string} publicDir - The directory where the public files are stored.
+	 */
+	indexPublicFiles(publicDir) {
+		// this method is meant to try to iterate over all public files which are stored as static routes
+	}
 
+	/**
+	 * Initializes the routing for the LayServer.
+	 * @param {Function} [router=null] - The router class to be used for routing.
+	 */
 	initRouting(router = null) {
 		if (router) this.router = new router(this);
 		if (typeof this.router == 'undefined') this.router = new Router(this);
 		this.routeControl = new LayRouting(this.router);
 	}
 
+	/**
+	 * Registers the given controllers.
+	 *
+	 * @param {Function|Function[]} controllers - The controllers to register.
+	 */
 	registerControllers(controllers) {
 		if (!Array.isArray(controllers)) controllers = [controllers];
 
@@ -115,6 +150,11 @@ export default class LayServer {
 		}
 	}
 
+	/**
+	 * Instantiates a controller and sets its namespace in the route control.
+	 * @param {Object} controller - The controller to be instantiated.
+	 * @returns {Object} - The instantiated controller.
+	 */
 	instantiateController(controller) {
 		this.routeControl.setNamespace(controller.namespace);
 		const _temp = new controller(this.routeControl);
@@ -122,10 +162,20 @@ export default class LayServer {
 		return _temp;
 	}
 
+	/**
+	 * Checks if the server is running.
+	 * @returns {boolean} True if the server is running, false otherwise.
+	 */
 	isRunning() {
 		proc != null;
 	}
 
+	/**
+	 * Handles an incoming request.
+	 *
+	 * @param {Request} req - The incoming request object.
+	 * @returns {Promise<Response>} - A promise that resolves to a response object.
+	 */
 	async handleRequest(req) {
 		const url = new URL(req.url);
 
@@ -168,14 +218,18 @@ export default class LayServer {
 		return resp;
 	}
 
-	listen(port = 8080) {
+	/**
+	 * Starts the server and listens for incoming requests on the specified port.
+	 * @param {number} [port=8080] - The port number to listen on.
+	 */
+	async listen(port = 8080, cb = () => {}) {
 		try {
-			this.proc = Bun.serve({
+			this.proc = await Bun.serve({
 				port,
 				development: Bun.env.BUN_ENV != 'production',
 				fetch: this.handleRequest.bind(this),
 				error(err) {
-					console.log(err.stack);
+					console.log('where', err.stack);
 					return new Response(`<pre>${err}\n${err.stack}</pre>`, {
 						headers: {
 							'Content-Type': 'text/html',
@@ -188,24 +242,66 @@ export default class LayServer {
 				throw new Error('something went wrong');
 			}
 
-			console.log(
-				this.proc,
-				`listening on ${this.proc.hostname} with port ${this.proc.port}`
-			);
+			if (!!cb && cb.constructor?.name.endsWith('Function')) {
+				cb(this.proc);
+			}
 		} catch (err) {
 			console.log('where', err.stack);
 			console.error(err);
 		}
 	}
 
-	load(filepath) {
-		const filename = filepath.split('/').pop().toString();
-		const ext = filename.split('.').pop().toLowerCase();
+	/**
+	 * Retrieves the path of a view file based on the given filepath.
+	 * @param {string} filepath - The filepath of the view file.
+	 * @returns {Promise<string|null>} - The path of the view file, or null if not found.
+	 */
+	async getViewPath(filepath) {
+		let path = this.options.get('viewsPath');
+		if (!path.endsWith('/')) path += '/';
 
-		for (const keys of this.loaders.keys()) {
-			if (keys.includes(ext)) {
-				return this.loaders.get(keys)(filepath);
+		const filename = filepath.split('/').pop().toString();
+		const basedir = filepath.substring(0, filepath.indexOf(filename));
+		path += basedir;
+		if (!path.endsWith('/')) path += '/';
+
+		const files = await readdir(path);
+		for (let file of files) {
+			console.log(
+				file,
+				file.substring(0, file.indexOf('.')),
+				filename.substring(0, filename.indexOf('.')) || filename
+			);
+			if (
+				(file.substring(0, file.indexOf('.')) || file) !=
+				(filename.substring(0, filename.indexOf('.')) || filename)
+			)
+				continue;
+			return `${path}${file}`;
+		}
+
+		return null;
+	}
+
+	/**
+	 * Loads a file from the specified filepath.
+	 *
+	 * @param {string} filepath - The path of the file to load.
+	 * @returns {DefaultLoader} - The loader for the file.
+	 */
+	async load(filepath) {
+		const fullFilePath = await this.getViewPath(filepath);
+		if (!fullFilePath) return new DefaultLoader(filepath);
+		const filename = fullFilePath.split('/').pop().toString();
+		const ext = filename.substring(filename.indexOf('.') + 1);
+
+		if (this.loaders.size > 0) {
+			for (const keys of this.loaders.keys()) {
+				if (!keys.includes(ext)) continue;
+				return this.loaders.get(keys).handle(fullFilePath);
 			}
 		}
+
+		return new DefaultLoader(filepath);
 	}
 }
