@@ -109,6 +109,7 @@ export default class Router {
 		}
 
 		try {
+			await reqContext.request.parseBody();
 			const retVal = await handle.callback(
 				reqContext.request,
 				reqContext.response
