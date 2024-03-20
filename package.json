@@ -1,14 +1,13 @@
 {
-	"name": "layc",
-	"version": "1.2.0",
-	"devDependencies": {
-		"bun-types": "latest",
-		"chokidar": "^3.5.3"
-	},
-	"scripts": {
-		"test": "bun test",
-		"examples": "bun run ./examples/index.js"
-	},
-	"type": "module",
-	"dependencies": {}
+  "name": "layc",
+  "version": "1.2.0",
+  "devDependencies": {
+    "bun-types": "latest"
+  },
+  "scripts": {
+    "test": "bun test",
+    "examples": "bun run ./examples/index.js"
+  },
+  "type": "module",
+  "dependencies": {}
 }
