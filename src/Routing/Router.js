@@ -1,8 +1,9 @@
-import LayRequest from '../IO/LayRequest';
-import LayResponse from '../IO/LayResponse';
 import RequestParser from '../Utils/RequestParser';
+import BaseRouter from './BaseRouter';
+import Logger from '../Utils/Logger';
 
-export default class Router {
+export default class Router extends BaseRouter {
+	domain = undefined;
 	server = undefined;
 	routes = new Map();
 	static allMethodKey = '$all';
@@ -10,6 +11,7 @@ export default class Router {
 	headerList = new Map();
 
 	constructor(server) {
+		super();
 		this.server = server;
 	}
 
@@ -17,15 +19,11 @@ export default class Router {
 		return this.server;
 	}
 
-	async handle(req) {
-		if (!(req instanceof Request)) {
-			throw new Error('`req` is not a proper Request');
-		}
-
-		let method = (req.method || '').toString().toLowerCase();
+	async handle(reqContext) {
+		let method = (reqContext.request.method || '').toString().toLowerCase();
 		const methodKey = `$${method.toLowerCase()}`;
 		let path;
-		let url = req.url;
+		let url = reqContext.request.url;
 
 		if (!(url instanceof URL) && typeof url == 'string') {
 			url = new URL(url);
@@ -78,16 +76,6 @@ export default class Router {
 			});
 		}
 
-		const reqContext = {
-			request: null,
-			response: null,
-		};
-		try {
-			reqContext.request = new LayRequest(req);
-			reqContext.response = new LayResponse(this);
-		} catch (err) {
-			console.log(err);
-		}
 		let handle =
 			currentNode.get(methodKey) || currentNode.get(Router.allMethodKey);
 
@@ -124,7 +112,7 @@ export default class Router {
 				}
 			}
 		} catch (err) {
-			console.log(err);
+			Logger(err);
 			return new Response('Error', { status: 500 });
 		}
 
@@ -141,21 +129,23 @@ export default class Router {
 		});
 	}
 
-	add(route, callback, method = 'get', middleware = null) {
+	add(route, callback) {
+		let options = arguments[2];
+		let middleware = arguments[3];
 		if (typeof callback != 'function')
 			throw new Error('`callback` is not a function');
 		if (typeof route != 'string')
 			throw new Error('`route` is not a string');
-		if (Router.methods.indexOf(method) < 0)
+		if (Router.methods.indexOf(options.method) < 0)
 			throw new Error(
-				`invalid \`method\` (${method}) given`,
+				`invalid \`method\` (${options.method}) given`,
 				Router.methods
 			);
 		if (!Array.isArray(middleware)) {
 			middleware = typeof middleware == 'function' ? [middleware] : null;
 		}
 
-		const methodKey = `$${method.toLowerCase()}`;
+		const methodKey = `$${options.method.toLowerCase()}`;
 		if (route.startsWith('/')) route = route.substring(1);
 		if (route.endsWith('/')) route = route.substring(0, route.length - 1);
 
@@ -165,14 +155,14 @@ export default class Router {
 
 		if (route == '') {
 			if (currentNode.get(methodKey)) {
-				if (!this.server.option('allowOverwrite')) {
-					console.log(
-						`overwriting of routes is prohibited: [${method}] \`${route}\``
+				if (!this.server.option('allowRouteOverwrite')) {
+					Logger(
+						`overwriting of routes is prohibited: [${options.method}] \`${route}\``
 					);
 					return;
 				}
 
-				console.log(`overwriting route for \`${route}\``);
+				Logger(`overwriting route for \`${route}\``);
 			}
 			currentNode.set(methodKey, { callback, middleware, params: [] });
 			return;
@@ -202,14 +192,14 @@ export default class Router {
 		}
 
 		if (currentNode.has(methodKey)) {
-			if (!this.server.option('allowOverwrite')) {
-				console.log(
+			if (!this.server.option('allowRouteOverwrite')) {
+				Logger(
 					`overwriting of routes is prohibited: [${method}] \`${route}\``
 				);
 				return;
 			}
 
-			console.log(`overwriting route for \`${route}\``);
+			Logger(`overwriting route for \`${route}\``);
 		}
 
 		currentNode.set(methodKey, { callback, middleware, params });

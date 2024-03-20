@@ -1,0 +1,51 @@
+import Logger from '../Utils/Logger';
+
+export default class BaseRouter {
+    add(path, cb, options = {}) {
+        Logger.error('add method not implemented');
+    }
+
+    any(path, cb) {
+        this.all(path, cb);
+    }
+
+    all(path, cb) {
+        this.add(path, cb, { ...(arguments[2] || {}), method: 'all' });
+        return this;
+    }
+
+    get(path, cb) {
+        this.add(path, cb, { ...(arguments[2] || {}), method: 'get' });
+        return this;
+    }
+
+    post(path, cb) {
+        this.add(path, cb, { ...(arguments[2] || {}), method: 'post' });
+        return this;
+    }
+
+    put(path, cb) {
+        this.add(path, cb, { ...(arguments[2] || {}), method: 'put' });
+        return this;
+    }
+
+    patch(path, cb) {
+        this.add(path, cb, { ...(arguments[2] || {}), method: 'patch' });
+        return this;
+    }
+
+    delete(path, cb) {
+        this.add(path, cb, { ...(arguments[2] || {}), method: 'delete' });
+        return this;
+    }
+
+    head(path, cb) {
+        this.add(path, cb, { ...(arguments[2] || {}), method: 'head' });
+        return this;
+    }
+
+    options(path, cb) {
+        this.add(path, cb, { ...(arguments[2] || {}), method: 'options' });
+        return this;
+    }
+}

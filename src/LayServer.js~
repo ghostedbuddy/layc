@@ -264,7 +264,7 @@ export default class LayServer extends BaseRouter {
 
 		const files = await readdir(path);
 		for (let file of files) {
-			Logger(
+			console.log(
 				file,
 				file.substring(0, file.indexOf('.')),
 				filename.substring(0, filename.indexOf('.')) || filename

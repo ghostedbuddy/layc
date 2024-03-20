@@ -17,6 +17,10 @@ export default async function RequestParser(req) {
 	try {
 		const contentType = req.headers.get('Content-Type')?.toLowerCase();
 
+		let val = await req.text();
+		console.log(val);
+		return {};
+
 		if (!contentType) return await req.text();
 
 		if (contentType.indexOf('multipart') >= 0)
@@ -27,6 +31,6 @@ export default async function RequestParser(req) {
 
 		return await req.text();
 	} catch (err) {
-		Logger(err, typeof req, req.constructor.name);
+		console.log(err, typeof req, req.constructor.name);
 	}
 }

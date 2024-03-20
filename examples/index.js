@@ -1,5 +1,8 @@
 import { LayServer } from '../src';
-import { google } from 'googleapis';
+import {resolve} from 'path';
+import Html from '../src/Views/Html';
+
+const APP_PORT = Bun.env.APP_PORT ?? Bun.env.PORT ?? 3000;
 
 class InfoController {
 	static namespace = 'info';
@@ -10,7 +13,10 @@ class InfoController {
 	}
 
 	index(req, res) {
-		res.text('I think you are right here');
+		return res.json({
+			headers: req.headers
+		})
+		res.text('I think you are right here <a href="/country/spain">now go here</a>');
 	}
 
 	countryInfo(req, res) {
@@ -28,54 +34,16 @@ class InfoController {
 	}
 }
 
-class oAuthController {
-	static namespace = 'oauth';
-	constructor(server) {
-		server.get('/:provider', this.auth.bind(this));
-		server.get('/callback/:provider', this.callback.bind(this));
-	}
-
-	async auth(req, res) {
-		if (req.params.get('provider') != 'google') {
-			return {
-				messages: 'invalid provider',
-				data: [...req.params.entries()],
-			};
-		}
-
-		const scopes = 'https://www.googleapis.com/auth/youtube';
-		const url = oauth2Client.generateAuthUrl({
-			// 'online' (default) or 'offline' (gets refresh_token)
-			access_type: 'offline',
-
-			// If you only need one scope you can pass it as a string
-			scope: scopes,
-		});
-
-		console.log(url);
-
-		return Response.redirect(url, 301);
-	}
-
-	callback(req, res) {
-		if (!req.query.get('code')) {
-			return new Response('/', { status: 302 });
-		}
-
-		return new Response(`/${req.query.get('code')}`);
-	}
-}
-
 const server = new LayServer({
+	viewsPath: resolve(__dirname, 'views'),
+	loaders: new Map([[
+		'html', new Html()
+	]]),
 	controllers: [
 		function Main(server) {
 			server.get('/', async (req, res) => {
-				return {
-					message: 'Hi mom, i am on the internet!',
-					batman: req.query.get('batman'),
-					body: req.query,
-				};
-			});
+				return res.json({message: 'hello world'})
+			}, { domain: 'api.tipedi.local' });
 			server.all('/data', (req, res) => {
 				let respBody = `your ${req.method} request was well recieved`;
 				switch (req.method) {
@@ -110,9 +78,14 @@ const server = new LayServer({
 				});
 			});
 		},
-		oAuthController,
 		InfoController,
 	],
 });
 
-server.listen(Bun.env.APP_PORT ?? Bun.env.PORT ?? 42169);
+server.get('/', async (req, res) => {
+	return res.render('index');
+});
+
+server.listen(APP_PORT, () => {
+	console.log(`server listen on ${APP_PORT}`);
+});

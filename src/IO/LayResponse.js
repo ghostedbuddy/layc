@@ -1,6 +1,7 @@
 import MimeTypeMap from './MimeTypeMap';
 
 export default class LayResponse {
+	routing = undefined;
 	body;
 	statusCode;
 	headerList = new Map();
@@ -9,8 +10,8 @@ export default class LayResponse {
 		disableFileCheck: false,
 	};
 
-	constructor(router) {
-		this.router = router;
+	constructor(routing) {
+		this.routing = routing;
 		this.body = 'Not Implemented';
 		this.statusCode = 502;
 		this.headerList = new Map();
@@ -101,7 +102,7 @@ export default class LayResponse {
 	}
 
 	async render(path, data = {}) {
-		const loader = await this.router.getServer().load(path);
+		const loader = await this.routing.getServer().load(path);
 		const content = await loader.parse(data, {
 			status: this.status(),
 			headers: this.headers(),
