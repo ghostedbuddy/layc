@@ -7,7 +7,7 @@ function Logger (data, type = 'debug') {
 }
 
 for(const k of LOGGING_TYPES) {
-	Logger.prototype[k] = function() {
+	Logger[k] = function() {
 		Logger(arguments, k);
 	}
 }
