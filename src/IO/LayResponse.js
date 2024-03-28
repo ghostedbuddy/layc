@@ -1,35 +1,94 @@
 import MimeTypeMap from './MimeTypeMap';
 
 export default class LayResponse {
-	routing = undefined;
-	body;
-	statusCode;
-	headerList = new Map();
-	mimeType;
-	options = {
+	#routing = undefined;
+	#body = 'Not Implemented';
+	#file = undefined;
+	#redirectUrl = undefined;
+	#statusCode = 502;
+	#headerList = new Map();
+	#mimeType = 'text/plain';
+	#options = {
 		disableFileCheck: false,
 	};
 
 	constructor(routing) {
-		this.routing = routing;
-		this.body = 'Not Implemented';
-		this.statusCode = 502;
-		this.headerList = new Map();
-		this.mimeType = 'text/plain';
+		this.#routing = routing;
 	}
 
-	async send(str) {
-		this.type('text');
-		this.body = str;
+	type(key) {
+		if (!MimeTypeMap.has(key)) {
+			if(this.#mimeType != 'text/plain') this.#mimeType = MimeTypeMap.get('text');
+			return;
+		}
+		this.mimeType = MimeTypeMap.get(key);
+	}
 
-		if (this.options.disableFileCheck) return;
+	status(value = null) {
+		if (isNaN(value)) throw new TypeError('status has to be a number');
+		this.#statusCode = value || 502;
+	}
+
+	redirect(value = null, status = 302) {
+		if (value === null) {
+			return this.#redirectUrl;
+		}
+
+		this.#redirectUrl = value;
+		this.status(status);
+	}
+
+	headers() {
+		if (!this.#headerList.get('Content-Type')) {
+			this.#headerList.set('Content-Type', `${this.#mimeType}`);
+		}
+		return this.#headerList;
+	}
+
+	header(key, value) {
+		this.#headerList.set(key, value);
+	}
+
+	async build(options = {}) {
+		if (this.#redirectUrl) {
+			return Response.redirect(this.#redirectUrl, this.status());
+		}
+
+		if(this.#file) return new Response(this.#file);
+
+		if(['text/plain'].includes(this.#mimeType)) {
+			await this.handleLayout(this.#body, options);
+		}
+
+		return new Response(this.#body, {
+			status: this.status(),
+			headers: this.headers(),
+		});
+	}
+
+	async send() {
+		await this.text(...arguments);
+
+		if (typeof(arguments[0]) != 'string' || !arguments[0]) return;
+		if (this.#options.disableFileCheck) return;
+
 		try {
-			const temp = Bun.file(str);
+			const temp = Bun.file(arguments[0]);
 
 			if (await temp.exists()) {
-				this.file = str;
+				this.#file = temp;
 			}
 		} catch (err) {}
+	}
+
+	async text() {
+		let [value, ...rest] = arguments;
+		if (typeof value != 'string') {
+			value = JSON.stringify(value);
+		}
+
+		this.type('text');
+		await this.handleLayout(value, ...rest);
 	}
 
 	json(data, options = {}) {
@@ -41,72 +100,30 @@ export default class LayResponse {
 			space = 0;
 		}
 		this.type('json');
-		this.body = JSON.stringify(data, replacer, space);
-	}
-
-	type(key) {
-		if (!MimeTypeMap.has(key)) {
-			this.mimeType = MimeTypeMap.get('text');
-			return;
-		}
-		this.mimeType = MimeTypeMap.get(key);
-	}
-
-	status(value = null) {
-		if (isNaN(value)) throw new Error('status has to be a number');
-		this.statusCode = value || 502;
-	}
-
-	text(value = null) {
-		if (typeof value != 'string') {
-			value = JSON.stringify(value);
-		}
-
-		this.type('text');
-		this.body = value;
-	}
-
-	json(value = null) {
-		this.text(value);
-		this.type('json');
-	}
-
-	redirect(value = null, status = 302) {
-		if (value === null) {
-			return this.redirectUrl;
-		}
-
-		this.redirectUrl = value;
-		this.status(status);
-	}
-
-	headers() {
-		if (!this.headerList.get('Content-Type')) {
-			this.headerList.set('Content-Type', `${this.mimeType}`);
-		}
-		return this.headerList;
-	}
-
-	header(key, value) {
-		this.headerList.set(key, value);
-	}
-
-	build(options = {}) {
-		if (this.redirectUrl) {
-			return Response.redirect(this.redirectUrl, this.status());
-		}
-		return new Response(this.body, {
-			status: this.status(),
-			headers: this.headers(),
-		});
+		this.#body = JSON.stringify(data, replacer, space);
 	}
 
 	async render(path, data = {}) {
-		const loader = await this.routing.getServer().load(path);
-		const content = await loader.parse(data, {
-			status: this.status(),
-			headers: this.headers(),
-		});
+		const loader = await this.#routing.getServer().load(path);
+		const content = await loader.parse(data);
+
 		return content;
+	}
+
+	async handleLayout(content, options = {}) {
+		this.#body = String(content);
+		if(!options.hasOwnProperty('layout') || typeof options.layout !== 'string') {
+			if(this.#routing.getServer().hasLayout()) {
+				options.layout = this.#routing.getServer().getLayout();
+			}
+		}
+
+		if(!options.layout) return
+
+		const layout = await this.#routing.getServer().load(options.layout);
+		if(layout) {
+			this.#body = await layout.parse({ ...(options?.data || {}), content: String(content) },  options);
+			this.#mimeType = layout.mimeType;
+		}
 	}
 }

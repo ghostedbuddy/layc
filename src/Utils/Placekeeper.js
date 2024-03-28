@@ -1,51 +1,16 @@
 import Logger from './Logger';
 
+const TOKEN_PAIRS = [
+	['{{','}}']
+]
+
 export default class Placekeeper {
 	static init(content) {
 		const sections = Array();
 		const variables = new Map();
 		const currentSection = new Map();
 
-		for (let idx = 0; idx < content.length; idx++) {
-			const char = content[idx];
-			if (char == '{') {
-				if (content[idx + 1] == '{') {
-					if (currentSection.has('start')) currentSection.clear(); // everything before this was not a section then
-					// begins a new section meant to be for a variable but still can be an operational section
-					// @example: {{#if variableName}} {{#for variableName}} {{#while variableName}}
-					currentSection.set('start', idx);
-				}
-			} else if (currentSection.has('start')) {
-				if (char == '}') {
-					if (content[idx + 1] == '}') {
-						// ends a section
-						currentSection.set('end', idx + 2);
-						currentSection.set(
-							'content',
-							content
-								.substring(
-									currentSection.get('start'),
-									currentSection.get('end')
-								)
-								.toString()
-								.trim()
-						);
-
-						currentSection.set(
-							'variables',
-							Placekeeper.parseVariables(
-								currentSection.get('content')
-							)
-						);
-						sections.push(new Map(currentSection));
-						currentSection.clear();
-						idx++;
-					}
-				}
-			}
-		}
-
-		Logger('content to array', Placekeeper.contentToArray(content));
+		console.log('content to array', Placekeeper.contentToArray(content));
 
 		return {
 			variables,
@@ -53,35 +18,45 @@ export default class Placekeeper {
 		};
 	}
 
-	static contentToArray(content) {
-		const parts = content.split(/\{\{([^}]+)\}\}|\{(#[a-zA-Z]+)\s*([^}]+)\}/);
-		const result = [];
-		let stack = [];
-		function processStack() {
-			const block = stack.pop();
-			result.push(new Function('data', 'with(data){return `'+ block.content.join('') + '`;}'));
-		}
+	static walkToEnd(content, endToken = undefined) {
+		let result = {
+			stack: [],
+			length: 0
+		};
+		for(let idx = 0; idx < content.length; idx++) {
+			const char = content[idx];
+			const token = TOKEN_PAIRS.find((t) => {
+				if(!t[0].startsWith(char)) return false;
+				return content.substring(idx, idx + t[0].length) == t[0];
+			});
 
-		// Process each part of the split content
-		for (let i = 0; i < parts.length; i++) {
-			if (parts[i] === '#' && ['for', 'if', 'else', 'elseif', 'while'].includes(parts[i + 1])) {
-				// Start of control structure
-				stack.push({ type: parts[i + 1], content: [] });
-				i += 2; // Skip the control structure identifier
-			} else if (parts[i] === '/#' && ['for', 'if', 'while'].includes(stack[stack.length - 1].type)) {
-				// End of control structure
-				i++;
-				processStack();
-			} else if (stack.length > 0) {
-				// Inside a control structure
-				stack[stack.length - 1].content.push(parts[i]);
-			} else if (parts[i] !== undefined && parts[i] !== '#end') {
-				// Directly executable expression or static string
-				result.push(parts[i].startsWith('\n') ? '\n' + parts[i].trimStart() : parts[i].trimEnd());
+			if(token) {
+				// found new start token walk to end:
+				idx += token[0].length
+				const subset = Placekeeper.walkToEnd(content.substring(idx), token[1]);
+
+				// is  a subset convertable to a function?
+				// can't we convert the whole tree to one function so its only one call instead of iteration on runtime?
+
+				result.stack.push(subset.stack);
+				result.length += subset.length;
+				idx += subset.length + token[1].length - 1;
+			} else {
+				if(endToken && endToken.startsWith(char) && content.substring(idx, idx + endToken.length)) {
+					// found end token
+					return result;
+				}
+
+				if(result.stack.length == 0 || Array.isArray(result.stack[result.stack.length - 1])) result.stack.push('');
+				result.stack[result.stack.length - 1] += char;
+				result.length += char.length;
 			}
 		}
-
 		return result;
+	}
+
+	static contentToArray(content) {
+		return Placekeeper.walkToEnd(content);
 	}
 
 	static variableRegex = new RegExp(/[\w\d]/, 'i');
@@ -109,6 +84,8 @@ export default class Placekeeper {
 				currentVar = null;
 			}
 		}
+
+		return variables;
 	}
 
 	static parse(content, sections) {

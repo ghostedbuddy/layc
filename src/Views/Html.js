@@ -29,6 +29,7 @@ export default class HtmlEngine {
 		});
 
 		return {
+			mimeType: file.type || 'text/html',
 			parse: (data = null, options = {}) =>
 				this.parse(filepath, data, options),
 		};
@@ -50,17 +51,11 @@ export default class HtmlEngine {
 		let parsed = Placekeeper.parse(view.content, view.sections);
 		for (const [key, value] of Object.entries(data)) {
 			parsed = parsed.replace(
-				new RegExp(`{{${key}}}`, 'g'),
+				new RegExp(`{{\s?${key}\s?}}`, 'g'),
 				value.toString()
 			);
 		}
-		return new Response(parsed, {
-			...(options || {}),
-			headers: {
-				...(options.headers || {}),
-				'Content-Type': view.mimeType,
-				'Content-Length': view.size,
-			},
-		});
+
+		return parsed;
 	}
 }

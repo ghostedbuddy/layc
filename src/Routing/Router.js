@@ -33,12 +33,16 @@ export default class Router extends BaseRouter {
 		if (path.endsWith('/')) path = path.substring(0, path.length - 1);
 
 		let currentNode = this.routes;
+		let fallbackNode = currentNode.has('*') ? currentNode.get('*') : undefined;
 		let paramsList = [];
 
 		if (path != '') {
 			let segments = path.split('/');
 			for (let index = 0; index < segments.length; index++) {
 				const segment = segments[index];
+				if (currentNode.has('*')) {
+					fallbackNode = currentNode.get('*');
+				}
 
 				if (currentNode.has(segment)) {
 					currentNode = currentNode.get(segment);
@@ -51,7 +55,7 @@ export default class Router extends BaseRouter {
 					continue;
 				}
 
-				currentNode = null;
+				currentNode = fallbackNode ?? null;
 				break;
 			}
 		}
@@ -98,21 +102,24 @@ export default class Router extends BaseRouter {
 
 		try {
 			await reqContext.request.parseBody();
-			const retVal = await handle.callback(
+			let retVal = await handle.callback(
 				reqContext.request,
 				reqContext.response
 			);
 			if (typeof retVal != 'undefined') {
-				if (retVal instanceof Response) {
+				if (retVal instanceof Promise) {
+					retVal = await retVal;
+				} else if (retVal instanceof Response) {
 					return retVal;
 				} else if (typeof retVal == 'string') {
-					reqContext.response.send(retVal);
+					await reqContext.response.text(retVal);
 				} else {
 					reqContext.response.json(retVal);
 				}
 			}
 		} catch (err) {
 			Logger(err);
+			console.log(err);
 			return new Response('Error', { status: 500 });
 		}
 
@@ -123,10 +130,7 @@ export default class Router extends BaseRouter {
 			);
 		}
 
-		return new Response(reqContext.response.body, {
-			status: reqContext.response.status() || 200,
-			headers: reqContext.response.headers() || {},
-		});
+		return await reqContext.response.build();
 	}
 
 	add(route, callback) {

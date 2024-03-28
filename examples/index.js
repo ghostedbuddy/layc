@@ -1,6 +1,7 @@
 import { LayServer } from '../src';
 import {resolve} from 'path';
 import Html from '../src/Views/Html';
+import Markdown from '../src/Views/Markdown';
 
 const APP_PORT = Bun.env.APP_PORT ?? Bun.env.PORT ?? 3000;
 
@@ -36,6 +37,7 @@ class InfoController {
 
 const server = new LayServer({
 	viewsPath: resolve(__dirname, 'views'),
+	layout: 'blank.html',
 	loaders: new Map([[
 		'html', new Html()
 	]]),
@@ -43,7 +45,7 @@ const server = new LayServer({
 		function Main(server) {
 			server.get('/', async (req, res) => {
 				return res.json({message: 'hello world'})
-			}, { domain: 'api.tipedi.local' });
+			}, { domain: 'example.layc.dev' });
 			server.all('/data', (req, res) => {
 				let respBody = `your ${req.method} request was well recieved`;
 				switch (req.method) {
@@ -85,6 +87,14 @@ const server = new LayServer({
 server.get('/', async (req, res) => {
 	return res.render('index');
 });
+
+server.get('/blog/:slug', async (req, res) => {
+	return res.send('index.html', { layout: 'blank.html' });
+});
+
+server.use(async (req, res) => {
+	return res.send('batman');
+})
 
 server.listen(APP_PORT, () => {
 	console.log(`server listen on ${APP_PORT}`);

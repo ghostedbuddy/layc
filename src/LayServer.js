@@ -14,12 +14,13 @@ import Logger from './Utils/Logger';
  * @class
  */
 export default class LayServer extends BaseRouter {
-	controllers = new Map();
-	loaders = new Map();
-	proc = null;
-	publicFiles;
-	routing = null;
-	options = new Map([
+	#controllers = new Map();
+	#loaders = new Map();
+	#proc = null;
+	#publicFiles;
+	#routing = null;
+	#options = new Map([
+		['layout',  undefined],
 		['loaders', undefined],
 		['publicDir', undefined],
 		['viewsPath', undefined],
@@ -40,15 +41,15 @@ export default class LayServer extends BaseRouter {
 			const optionKeys = Object.getOwnPropertyNames(options);
 
 			for (const key of optionKeys) {
-				if (!this.options.has(key)) continue;
+				if (!this.#options.has(key)) continue;
 				if (key == 'loaders') continue;
-				const valueType = typeof this.options.get(key);
+				const valueType = typeof this.#options.get(key);
 				if (
 					typeof options[key] !== 'undefined' &&
 					(typeof options[key] == valueType ||
 						valueType == 'undefined')
 				)
-					this.options.set(key, options[key]);
+					this.#options.set(key, options[key]);
 			}
 
 			if (options.hasOwnProperty('loaders')) {
@@ -58,10 +59,10 @@ export default class LayServer extends BaseRouter {
 			}
 		}
 
-		this.routing = new LayRouting(this);
+		this.#routing = new LayRouting(this);
 
 		if(options.router) {
-			this.routing.addRouter(options.router);
+			this.#routing.addRouter(options.router);
 		}
 
 		if (options.hasOwnProperty('controllers')) {
@@ -72,13 +73,13 @@ export default class LayServer extends BaseRouter {
 
 		if (
 			!options.publicFiles &&
-			this.options.discoverPublicFiles &&
-			this.options.publicDir
+			this.#options.discoverPublicFiles &&
+			this.#options.publicDir
 		)
-			this.indexPublicFiles(this.options.publicDir);
+			this.indexPublicFiles(this.#options.publicDir);
 
-		if (!this.options.viewsEngine && this.options.viewsPath) {
-			this.options.viewsEngine = new HtmlEngine();
+		if (!this.#options.viewsEngine && this.#options.viewsPath) {
+			this.#options.viewsEngine = new HtmlEngine();
 		}
 	}
 
@@ -89,9 +90,9 @@ export default class LayServer extends BaseRouter {
 	 * @returns {*} - The current value of the option, or undefined if the option does not exist.
 	 */
 	option(key, value = undefined) {
-		if (!this.options.has(key)) return undefined;
+		if (!this.#options.has(key)) return undefined;
 		if (value !== undefined) this.option.set(key, value);
-		return this.options.get(key);
+		return this.#options.get(key);
 	}
 
 	/**
@@ -105,11 +106,11 @@ export default class LayServer extends BaseRouter {
 			throw new Error(
 				'publicFiles option has to be an array or undefined'
 			);
-		if (!this.publicFiles || !Array.isArray(this.publicFiles))
-			this.publicFiles = [];
+		if (!this.#publicFiles || !Array.isArray(this.#publicFiles))
+			this.#publicFiles = [];
 		for (let path of filePaths) {
 			if (typeof path != 'string') continue;
-			this.publicFiles.push(path);
+			this.#publicFiles.push(path);
 		}
 	}
 
@@ -139,11 +140,11 @@ export default class LayServer extends BaseRouter {
 
 			// if the given controller is just an anonymous function defining the routes itself
 			if (!controller?.prototype?.constructor?.name) {
-				controller(this.routing);
+				controller(this.#routing);
 				continue;
 			}
 
-			this.controllers.set(
+			this.#controllers.set(
 				controller?.name,
 				this.instantiateController(controller)
 			);
@@ -156,9 +157,9 @@ export default class LayServer extends BaseRouter {
 	 * @returns {Object} - The instantiated controller.
 	 */
 	instantiateController(controller) {
-		this.routing.setNamespace(controller.namespace);
-		const _temp = new controller(this.routing);
-		if (controller.namespace) this.routing.setNamespace(null);
+		this.#routing.setNamespace(controller.namespace);
+		const _temp = new controller(this.#routing);
+		if (controller.namespace) this.#routing.setNamespace(null);
 		return _temp;
 	}
 
@@ -181,10 +182,10 @@ export default class LayServer extends BaseRouter {
 
 		if (
 			!url.pathname.endsWith('/') &&
-			Array.isArray(this.publicFiles) &&
-			this.publicFiles.length > 0
+			Array.isArray(this.#publicFiles) &&
+			this.#publicFiles.length > 0
 		) {
-			let path = this.publicFiles.find(
+			let path = this.#publicFiles.find(
 				(v) => url.pathname.substring(1) === v
 			);
 			if (path) {
@@ -192,7 +193,7 @@ export default class LayServer extends BaseRouter {
 					return new Response(
 						Bun.file(
 							resolvePath(
-								this.options.get('publicDir') ??
+								this.#options.get('publicDir') ??
 									`${import.meta.dir}/public`,
 								path
 							)
@@ -207,11 +208,11 @@ export default class LayServer extends BaseRouter {
 			}
 		}
 
-		if (this.options.enforceTrailingSlash && !url.pathname.endsWith('/')) {
+		if (this.#options.enforceTrailingSlash && !url.pathname.endsWith('/')) {
 			return Response.redirect(`${url.toString()}/`, 302);
 		}
 
-		let resp = await this.routing.handle(req);
+		let resp = await this.#routing.handle(req);
 		if (resp instanceof Response) return resp;
 		return new Response('Not Found', { status: 404 });
 	}
@@ -254,7 +255,7 @@ export default class LayServer extends BaseRouter {
 	 * @returns {Promise<string|null>} - The path of the view file, or null if not found.
 	 */
 	async getViewPath(filepath) {
-		let path = this.options.get('viewsPath');
+		let path = this.#options.get('viewsPath');
 		if (!path.endsWith('/')) path += '/';
 
 		const filename = filepath.split('/').pop().toString();
@@ -290,7 +291,7 @@ export default class LayServer extends BaseRouter {
 		const fullFilePath = await this.getViewPath(filepath);
 		if (!fullFilePath) return new DefaultLoader(filepath);
 		const filename = fullFilePath.split('/').pop().toString();
-		const ext = filename.substring(filename.indexOf('.') + 1);
+		const ext = filename.substring(filename.lastIndexOf('.') + 1);
 
 		if (this.loaders.size > 0) {
 			for (const keys of this.loaders.keys()) {
@@ -302,7 +303,21 @@ export default class LayServer extends BaseRouter {
 		return new DefaultLoader(filepath);
 	}
 
-	async add(path, cb) {
-		this.routing.add(...arguments)
+	add(path, cb) {
+		this.#routing.add(...arguments)
+	}
+
+	use (cb) {
+		this.add('*', cb, arguments[1]);
+	}
+
+	hasLayout() {
+		return typeof(this.#options.get('layout')) == 'string' && this.#options.get('layout').length > 0;
+	}
+
+	getLayout() {
+		if(!this.#options.has('layout')) return undefined;
+
+		return this.#options.get('layout');
 	}
 }

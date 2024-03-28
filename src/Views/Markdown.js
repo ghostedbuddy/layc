@@ -34,7 +34,7 @@ export default class MarkdownEngine {
 				['sections', sections],
 				['variables', variables],
 				['metadata', metadata],
-				['mimeType', file.type || 'text/html'],
+				['mimeType', file.type || 'text/markdown'],
 				['size', file.size],
 			])
 		);
@@ -42,6 +42,7 @@ export default class MarkdownEngine {
 		console.log(filepath, this.#internalCache.get(filepath));
 
 		return {
+			mimeType: file.type || 'text/markdown',
 			parse: (data = null, options = {}) =>
 				this.parse(filepath, data, options),
 		};

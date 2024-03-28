@@ -97,4 +97,8 @@ export default class LayRouting extends BaseRouter {
 			this.routers.get(options.domain).add (path, cb, options);
 		}
 	}
+
+	use (cb) {
+		this.add('*', cb, arguments[1]);
+	}
 }
